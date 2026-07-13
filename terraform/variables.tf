@@ -52,6 +52,12 @@ variable "enable_webhook" {
   default     = false
 }
 
+variable "codeconnection_arn" {
+  description = "ARN of the CodeConnections (formerly CodeStar) connection CodeBuild uses to pull source from GitHub. The build role is granted UseConnection on it."
+  type        = string
+  default     = "arn:aws:codeconnections:us-east-1:847814615258:connection/71dafbdd-0956-49be-9e85-7aab7f2e2c90"
+}
+
 variable "state_bucket" {
   description = "S3 bucket holding Terraform remote state (must match TF_STATE_BUCKET in buildspec.yml). CodeBuild's role is granted access to it."
   type        = string

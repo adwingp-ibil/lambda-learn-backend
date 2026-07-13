@@ -31,6 +31,21 @@ data "aws_iam_policy_document" "codebuild" {
     resources = ["arn:aws:s3:::${var.state_bucket}", "arn:aws:s3:::${var.state_bucket}/*"]
   }
 
+  # Pull source from GitHub via the CodeConnections connection. Without this the
+  # DOWNLOAD_SOURCE phase fails with "Access denied to connection".
+  statement {
+    sid = "UseCodeConnection"
+    actions = [
+      "codeconnections:UseConnection",
+      "codeconnections:GetConnection",
+      "codeconnections:GetConnectionToken",
+      "codestar-connections:UseConnection",
+      "codestar-connections:GetConnection",
+      "codestar-connections:GetConnectionToken",
+    ]
+    resources = [var.codeconnection_arn]
+  }
+
   # Manage the resources Terraform owns.
   statement {
     sid = "ManageStack"
