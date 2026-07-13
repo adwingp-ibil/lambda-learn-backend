@@ -1,30 +1,67 @@
 version: 0.2
 
-# CodeBuild builds the Lambda deployment package and pushes it with
-# `aws lambda update-function-code`. Infrastructure (the function, its role,
-# this CodeBuild project, the artifact bucket) is managed by Terraform, not here.
+# AWS CodeBuild pipeline for lambda-learn-backend.
 #
-# FUNCTION_NAME and ARTIFACT_BUCKET are set on the CodeBuild project by
-# terraform/codebuild.tf.
+# Stages: install Node 20 + Terraform -> npm install -> npm test ->
+#         terraform apply (creates the Lambda function, IAM role, CloudWatch
+#         log group, the CodeBuild project, and the artifact bucket).
+#
+# TF_STATE_BUCKET must name an S3 bucket that ALREADY EXISTS (same region as
+# this build) to hold Terraform state. Locking uses S3-native locking
+# (use_lockfile), so no DynamoDB table is needed (requires Terraform >= 1.10).
+#
+# The CodeBuild service role must be able to manage this stack and the state
+# bucket (see terraform/codebuild.tf).
+
+env:
+  variables:
+    TERRAFORM_VERSION: "1.11.4"
+    TF_STATE_BUCKET: "lambda-learn-tfstate-adwingp"
+    TF_STATE_KEY: "lambda-learn/terraform.tfstate"
 
 phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing Terraform ${TERRAFORM_VERSION}..."
+      - curl -sSLo /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+      - unzip -o /tmp/terraform.zip -d /tmp
+      - mv /tmp/terraform /usr/local/bin/terraform
+      - terraform version
+
+  pre_build:
+    commands:
+      - echo "Node version:" && node --version
+      - echo "Installing dependencies..."
+      - cd "$CODEBUILD_SRC_DIR/src" && npm install
+
   build:
     commands:
-      - echo "Building deployment package..."
-      - cd "$CODEBUILD_SRC_DIR/src"
-      - npm install --omit=dev
-      - zip -r "$CODEBUILD_SRC_DIR/lambda.zip" .
+      - echo "Running unit tests..."
+      - cd "$CODEBUILD_SRC_DIR/src" && npm test
+      - echo "Deploying infrastructure with Terraform..."
+      - cd "$CODEBUILD_SRC_DIR/terraform"
+      - |
+        terraform init -input=false \
+          -backend-config="bucket=${TF_STATE_BUCKET}" \
+          -backend-config="key=${TF_STATE_KEY}" \
+          -backend-config="region=${AWS_DEFAULT_REGION}" \
+          -backend-config="use_lockfile=true"
+      - |
+        # Adopt a pre-existing CloudWatch log group into Terraform state.
+        # A /aws/lambda/<fn> log group can linger after a Lambda is deleted,
+        # and Terraform would then fail trying to "create" it. Guarded so it
+        # is a no-op when already tracked or absent.
+        if ! terraform state list | grep -q '^aws_cloudwatch_log_group.lambda$'; then
+          echo "Importing pre-existing log group /aws/lambda/lambda-learn-backend (if present)..."
+          terraform import -input=false -var="aws_region=${AWS_DEFAULT_REGION}" \
+            aws_cloudwatch_log_group.lambda /aws/lambda/lambda-learn-backend || true
+        fi
+      - terraform apply -input=false -auto-approve -var="aws_region=${AWS_DEFAULT_REGION}"
+      - echo "Deploy complete. Outputs:"
+      - terraform output
 
   post_build:
     commands:
-      - cd "$CODEBUILD_SRC_DIR"
-      - echo "Deploying to $FUNCTION_NAME..."
-      - aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://lambda.zip
-      - |
-        if [ -n "$ARTIFACT_BUCKET" ]; then
-          aws s3 cp lambda.zip "s3://$ARTIFACT_BUCKET/lambda-$(date +%Y%m%d-%H%M%S)-$CODEBUILD_RESOLVED_SOURCE_VERSION.zip"
-        fi
-
-artifacts:
-  files:
-    - lambda.zip
+      - echo "Build completed on $(date)"

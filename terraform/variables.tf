@@ -51,3 +51,9 @@ variable "enable_webhook" {
   type        = bool
   default     = false
 }
+
+variable "state_bucket" {
+  description = "S3 bucket holding Terraform remote state (must match TF_STATE_BUCKET in buildspec.yml). CodeBuild's role is granted access to it."
+  type        = string
+  default     = "lambda-learn-tfstate-adwingp"
+}

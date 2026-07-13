@@ -2,10 +2,8 @@ locals {
   function_name = var.project_name
 }
 
-# Initial code package, used only when Terraform first CREATES the function.
-# After that, CodeBuild deploys new code via `aws lambda update-function-code`,
-# and the lifecycle block below tells Terraform to ignore those code changes so
-# `terraform apply` never reverts a CodeBuild deploy.
+# Terraform packages src/ and deploys it. CodeBuild runs `terraform apply`, so
+# the zip's hash (output_base64sha256) drives redeploys on each build.
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/../src"
@@ -47,11 +45,6 @@ resource "aws_lambda_function" "this" {
   source_code_hash = data.archive_file.lambda.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory
-
-  # CodeBuild owns code deploys; don't let Terraform revert them.
-  lifecycle {
-    ignore_changes = [filename, source_code_hash]
-  }
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,

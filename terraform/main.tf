@@ -1,5 +1,6 @@
 terraform {
-  required_version = ">= 1.5"
+  # >= 1.10 for S3-native state locking (use_lockfile) — no DynamoDB table.
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -12,9 +13,12 @@ terraform {
     }
   }
 
-  # Local state (terraform.tfstate on disk). Simple, no bootstrap needed.
-  # State lives only on the machine that runs apply — keep it, and don't run
-  # apply from two places at once.
+  # Remote state in S3. Config is supplied at init time so this file stays
+  # reusable:
+  #   local: terraform init -backend-config="bucket=..." -backend-config="key=..." \
+  #                         -backend-config="region=..." -backend-config="use_lockfile=true"
+  #   CI:    buildspec.yml passes the same flags.
+  backend "s3" {}
 }
 
 provider "aws" {
