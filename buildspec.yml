@@ -3,4 +3,12 @@ version: 0.2
 phases:
   build:
     commands:
-      - echo "build check"
+      - cd src && npm install && zip -r ../lambda.zip .
+  post_build:
+    commands:
+      - cd $CODEBUILD_SRC_DIR
+      - aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda.zip
+
+artifacts:
+  files:
+    - "lambda.zip"

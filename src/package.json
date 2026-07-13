@@ -1,0 +1,10 @@
+{
+  "name": "lambda-learn-backend",
+  "version": "1.0.0",
+  "description": "Learn backend Lambda function",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {}
+}
