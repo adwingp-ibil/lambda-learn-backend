@@ -12,13 +12,9 @@ terraform {
     }
   }
 
-  # Remote state in S3 with a DynamoDB lock table.
-  # Values are supplied at init time so this file stays reusable:
-  #   local: terraform init -backend-config=backend.hcl
-  #   CI:    terraform init -backend-config="bucket=..." -backend-config="dynamodb_table=..." ...
-  backend "s3" {
-    key = "lambda-learn/terraform.tfstate"
-  }
+  # Local state (terraform.tfstate on disk). Simple, no bootstrap needed.
+  # State lives only on the machine that runs apply — keep it, and don't run
+  # apply from two places at once.
 }
 
 provider "aws" {

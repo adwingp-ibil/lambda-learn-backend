@@ -47,24 +47,7 @@ variable "source_type" {
 }
 
 variable "enable_webhook" {
-  description = "Create a CodeBuild webhook so pushes to the default branch trigger a build. Requires a CodeBuild source credential to already exist in the account."
+  description = "Create a CodeBuild webhook so pushes to the repo trigger a build. Requires a CodeBuild source credential to already exist in the account."
   type        = bool
   default     = false
-}
-
-variable "terraform_version" {
-  description = "Terraform version CodeBuild downloads to run apply."
-  type        = string
-  default     = "1.9.8"
-}
-
-variable "state_bucket" {
-  description = "S3 bucket holding Terraform state (same value as backend.hcl). CodeBuild's role is granted access to it."
-  type        = string
-}
-
-variable "state_lock_table" {
-  description = "DynamoDB table used for state locking (same value as backend.hcl)."
-  type        = string
-  default     = "terraform-locks"
 }

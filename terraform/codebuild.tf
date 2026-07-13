@@ -1,6 +1,6 @@
 # --- CodeBuild service role ---
-# CodeBuild runs `terraform apply`, so its role must be able to manage every
-# resource in this stack plus read/write the remote state and lock table.
+# CodeBuild only builds a zip and updates the function code, so its role is
+# small: write build logs, update this one function, and upload artifacts.
 data "aws_iam_policy_document" "codebuild_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -23,40 +23,16 @@ data "aws_iam_policy_document" "codebuild" {
     resources = ["*"]
   }
 
-  # Terraform remote state (S3) + state lock (DynamoDB).
   statement {
-    sid       = "TfState"
-    actions   = ["s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["arn:aws:s3:::${var.state_bucket}", "arn:aws:s3:::${var.state_bucket}/*"]
-  }
-  statement {
-    sid       = "TfLock"
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
-    resources = ["arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/${var.state_lock_table}"]
+    sid       = "DeployCode"
+    actions   = ["lambda:UpdateFunctionCode", "lambda:GetFunction"]
+    resources = [aws_lambda_function.this.arn]
   }
 
-  # Manage the resources Terraform owns. IAM is scoped to this project's role
-  # names so a build can't touch unrelated roles.
   statement {
-    sid = "ManageStack"
-    actions = [
-      "lambda:*",
-      "logs:*",
-      "s3:*",
-      "codebuild:*",
-    ]
-    resources = ["*"]
-  }
-  statement {
-    sid = "ManageIamRoles"
-    actions = [
-      "iam:GetRole", "iam:PassRole", "iam:CreateRole", "iam:DeleteRole",
-      "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PutRolePolicy",
-      "iam:DeleteRolePolicy", "iam:GetRolePolicy", "iam:ListRolePolicies",
-      "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
-      "iam:TagRole", "iam:UntagRole",
-    ]
-    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-*"]
+    sid       = "PushArtifact"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.artifacts.arn}/*"]
   }
 }
 
@@ -69,7 +45,7 @@ resource "aws_iam_role_policy" "codebuild" {
 # --- CodeBuild project ---
 resource "aws_codebuild_project" "this" {
   name         = "${var.project_name}-build"
-  description  = "Builds and deploys ${var.project_name} via terraform apply."
+  description  = "Builds and deploys ${var.project_name} via aws lambda update-function-code."
   service_role = aws_iam_role.codebuild.arn
 
   artifacts {
@@ -82,20 +58,12 @@ resource "aws_codebuild_project" "this" {
     type         = "LINUX_CONTAINER"
 
     environment_variable {
-      name  = "TF_VERSION"
-      value = var.terraform_version
+      name  = "FUNCTION_NAME"
+      value = aws_lambda_function.this.function_name
     }
     environment_variable {
-      name  = "TF_STATE_BUCKET"
-      value = var.state_bucket
-    }
-    environment_variable {
-      name  = "TF_STATE_LOCK_TABLE"
-      value = var.state_lock_table
-    }
-    environment_variable {
-      name  = "AWS_DEFAULT_REGION"
-      value = var.aws_region
+      name  = "ARTIFACT_BUCKET"
+      value = aws_s3_bucket.artifacts.bucket
     }
   }
 
