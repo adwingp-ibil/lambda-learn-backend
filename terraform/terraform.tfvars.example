@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and adjust. Only state_bucket is required; the rest
+# have sensible defaults in variables.tf.
+aws_region       = "us-east-1"
+state_bucket     = "REPLACE_WITH_YOUR_STATE_BUCKET"
+state_lock_table = "terraform-locks"
+
+# project_name   = "lambda-learn-backend"
+# lambda_runtime = "nodejs20.x"
+# enable_webhook = true   # set once a GitHub source credential exists

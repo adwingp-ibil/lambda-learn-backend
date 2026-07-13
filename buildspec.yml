@@ -1,14 +1,32 @@
 version: 0.2
 
+# CodeBuild builds the Lambda dependencies and runs `terraform apply`, so
+# Terraform is the single source of truth for both infrastructure and code.
+# Environment variables (TF_VERSION, TF_STATE_BUCKET, TF_STATE_LOCK_TABLE,
+# AWS_DEFAULT_REGION) are set on the CodeBuild project by terraform/codebuild.tf.
+
 phases:
+  install:
+    commands:
+      - echo "Installing Terraform ${TF_VERSION}..."
+      - curl -sSLo /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+      - unzip -o /tmp/terraform.zip -d /usr/local/bin/
+      - terraform version
+
+  pre_build:
+    commands:
+      - echo "Installing Lambda dependencies..."
+      - cd "$CODEBUILD_SRC_DIR/src" && npm install --omit=dev
+
   build:
     commands:
-      - cd src && npm install && zip -r ../lambda.zip .
+      - cd "$CODEBUILD_SRC_DIR/terraform"
+      - terraform init -input=false -backend-config="bucket=${TF_STATE_BUCKET}" -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" -backend-config="region=${AWS_DEFAULT_REGION}"
+      - terraform apply -auto-approve -input=false -var="aws_region=${AWS_DEFAULT_REGION}" -var="state_bucket=${TF_STATE_BUCKET}" -var="state_lock_table=${TF_STATE_LOCK_TABLE}"
+
   post_build:
     commands:
-      - cd $CODEBUILD_SRC_DIR
-      - aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file fileb://lambda.zip
-
-artifacts:
-  files:
-    - "lambda.zip"
+      - echo "Archiving deployed artifact..."
+      - cd "$CODEBUILD_SRC_DIR/terraform"
+      - BUCKET=$(terraform output -raw artifacts_bucket)
+      - aws s3 cp build/lambda.zip "s3://$BUCKET/lambda-$(date +%Y%m%d-%H%M%S)-$CODEBUILD_RESOLVED_SOURCE_VERSION.zip"
