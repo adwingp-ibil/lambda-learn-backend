@@ -39,13 +39,10 @@ project (`lambda-learn-backend-build`), and the artifact bucket.
 Push to the repo → CodeBuild runs `buildspec.yml`: `npm install`, zip, then
 `aws lambda update-function-code`, and uploads the zip to the artifact bucket.
 
-To make pushes trigger builds automatically:
-1. Add a GitHub source credential once (Console → CodeBuild → connect to GitHub,
-   or `aws codebuild import-source-credentials`).
-2. Set `enable_webhook = true` in `terraform.tfvars` and re-run `terraform apply`.
+Builds are triggered manually — start one from the CodeBuild console or with
+`aws codebuild start-build --project-name lambda-learn-backend-build`.
 
-You can also start a build manually from the CodeBuild console, or deploy code
-straight from your machine without CodeBuild at all:
+You can also deploy code straight from your machine without CodeBuild at all:
 `cd src && npm install --omit=dev && zip -r ../lambda.zip . && aws lambda update-function-code --function-name lambda-learn-backend --zip-file fileb://../lambda.zip`
 
 ## Notes

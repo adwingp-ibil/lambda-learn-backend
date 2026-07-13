@@ -109,18 +109,3 @@ resource "aws_codebuild_project" "this" {
     }
   }
 }
-
-# Optional: trigger a build on every push. Requires a CodeBuild source
-# credential (GitHub OAuth/PAT) to already exist in the account/region.
-resource "aws_codebuild_webhook" "this" {
-  count        = var.enable_webhook ? 1 : 0
-  project_name = aws_codebuild_project.this.name
-  build_type   = "BUILD"
-
-  filter_group {
-    filter {
-      type    = "EVENT"
-      pattern = "PUSH"
-    }
-  }
-}

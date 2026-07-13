@@ -46,12 +46,6 @@ variable "source_type" {
   default     = "GITHUB"
 }
 
-variable "enable_webhook" {
-  description = "Create a CodeBuild webhook so pushes to the repo trigger a build. Requires a CodeBuild source credential to already exist in the account."
-  type        = bool
-  default     = false
-}
-
 variable "codeconnection_arn" {
   description = "ARN of the CodeConnections (formerly CodeStar) connection CodeBuild uses to pull source from GitHub. The build role is granted UseConnection on it."
   type        = string

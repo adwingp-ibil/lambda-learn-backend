@@ -4,4 +4,3 @@ aws_region = "us-east-1"
 
 # project_name   = "lambda-learn-backend"
 # lambda_runtime = "nodejs20.x"
-# enable_webhook = true   # set once a GitHub source credential exists
